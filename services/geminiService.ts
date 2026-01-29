@@ -10,39 +10,41 @@ export const generateAcademicPaper = async (input: PaperInput, customApiKey: str
 
   const ai = new GoogleGenAI({ apiKey });
   
-  // Mahasiswa atau mode 'deep' menggunakan model yang lebih cerdas (Pro)
-  const modelName = (input.educationLevel === 'Mahasiswa' || input.mode === 'deep') 
-    ? 'gemini-3-pro-preview' 
-    : 'gemini-3-flash-preview';
+  /**
+   * MENGAPA MENGGUNAKAN FLASH?
+   * Model 'gemini-3-flash-preview' memiliki kuota (Rate Limit) yang jauh lebih tinggi pada Free Tier 
+   * dibandingkan model Pro. Ini mencegah error 'Resource Exhausted' atau 'Quota Exceeded' 
+   * yang sering dialami pengguna akun gratis.
+   */
+  const modelName = 'gemini-3-flash-preview';
 
   const systemInstruction = `Anda adalah seorang Penulis Akademik Senior dan Profesor di Indonesia yang ahli dalam menyusun draf makalah ilmiah tingkat tinggi.
 Tugas Anda adalah menulis makalah yang SANGAT PANJANG, DETAIL, dan KOMPREHENSIF.
 
 ATURAN KETAT PENULISAN:
 1. PANJANG KONTEN (WAJIB):
-   - Latar Belakang (Bab I): Minimal 800-1000 kata. Harus mencakup latar belakang masalah secara makro, meso, dan mikro. Sertakan urgensi penelitian secara mendalam.
-   - Pembahasan (Bab II): Harus terdiri dari minimal 3-5 sub-bab utama. Setiap sub-bab WAJIB memiliki penjelasan minimal 600-800 kata. Berikan analisis kritis, bukan sekadar teori dasar.
-   - Kesimpulan (Bab III): Harus komprehensif, merangkum seluruh hasil pembahasan secara sistematis.
-2. BAHASA: Gunakan Bahasa Indonesia Baku (PUEBI/EYD) dengan diksi akademik tingkat tinggi. Hindari kalimat retoris atau pengulangan ide.
-3. KUALITAS: Berikan argumen yang logis, koheren, dan berbasis data/teori kuat.
-4. FORMAT: Output harus JSON murni tanpa narasi tambahan di luar JSON.
+   - Latar Belakang (Bab I): Tulis minimal 8-10 paragraf panjang. Uraikan fenomena secara makro ke mikro.
+   - Pembahasan (Bab II): Harus terdiri dari minimal 4 sub-bab utama. Setiap sub-bab WAJIB memiliki penjelasan minimal 5-7 paragraf analitis yang panjang.
+   - Penutup (Bab III): Kesimpulan harus merangkum seluruh esensi materi secara mendalam.
+2. BAHASA: Gunakan Bahasa Indonesia Baku (PUEBI/EYD) dengan diksi akademik tingkat tinggi.
+3. KUALITAS: Berikan argumen yang logis dan analisis kritis. Jangan hanya memberikan definisi dasar.
+4. FORMAT: Output harus JSON murni tanpa narasi tambahan.
 
 Struktur JSON:
-- preface: Kata pengantar yang menyentuh dan formal.
-- introduction: background (panjang), problemFormulation (3-5 poin), objectives (3-5 poin).
-- chapters: Array of objects (title, subChapters: array of {title, content}).
-- closing: conclusion (panjang), suggestions.
-- bibliography: Minimal 10 referensi akademik format APA Style.`;
+- preface: Kata pengantar formal.
+- introduction: { background, problemFormulation, objectives }.
+- chapters: Array of { title, subChapters: array of { title, content } }.
+- closing: { conclusion, suggestions }.
+- bibliography: Minimal 10 referensi format APA Style.`;
 
-  const prompt = `Buatkan MAKALAH AKADEMIK LENGKAP yang SANGAT PANJANG dengan judul: "${input.title}".
+  const prompt = `Buatkan MAKALAH AKADEMIK LENGKAP DAN SANGAT PANJANG dengan judul: "${input.title}".
 Tingkat Pendidikan: ${input.educationLevel}.
-Mode: ${input.mode === 'deep' ? 'Mendalam/Komprehensif (Tulis seberapa panjang mungkin)' : 'Standar'}.
+Mode: ${input.mode === 'deep' ? 'Mendalam/Komprehensif (Prioritaskan detail dan jumlah kata yang banyak)' : 'Standar'}.
 
 Instruksi Khusus:
-- Perluas setiap paragraf. Jangan hanya memberikan poin-poin.
-- Gunakan transisi antar paragraf yang halus.
-- Untuk tingkat Mahasiswa, sertakan tinjauan teoritis yang sangat kuat di Bab II.
-- Pastikan setiap sub-bab di Bab II membahas sudut pandang yang berbeda namun tetap relevan dengan judul.`;
+- Perbanyak narasi pada setiap sub-bab.
+- Berikan analisis yang tajam dan mendalam untuk setiap poin pembahasan.
+- Pastikan draf ini terasa seperti karya tulis mahasiswa tingkat akhir atau peneliti profesional.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -100,8 +102,8 @@ Instruksi Khusus:
           },
           required: ["introduction", "chapters", "closing", "bibliography"],
         },
-        // Memberikan thinking budget maksimal untuk model Pro agar hasil lebih matang dan panjang
-        ...(modelName === 'gemini-3-pro-preview' ? { thinkingConfig: { thinkingBudget: 32768 } } : { thinkingConfig: { thinkingBudget: 16000 } })
+        // Tetap gunakan thinking budget agar model Flash berpikir lebih dalam sebelum menulis
+        thinkingConfig: { thinkingBudget: input.mode === 'deep' ? 24576 : 12000 }
       },
     });
 
@@ -111,9 +113,10 @@ Instruksi Khusus:
     return JSON.parse(text.trim());
   } catch (error: any) {
     console.error("Gemini Error:", error);
-    if (error.message?.includes("429") || error.message?.includes("RESOURCE_EXHAUSTED")) {
-      throw new Error("Kuota API Key Anda telah habis atau limit harian tercapai. Silakan coba lagi nanti atau gunakan API Key dengan project/penagihan yang berbeda.");
+    const errorMsg = error.message || "";
+    if (errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED")) {
+      throw new Error("Batas penggunaan API (Quota) tercapai. Hal ini biasa terjadi pada API Key gratis. Silakan tunggu 1-2 menit sebelum mencoba lagi, atau gunakan API Key yang sudah terhubung dengan penagihan (Pay-as-you-go) untuk batas yang lebih besar.");
     }
-    throw new Error(error.message || "Gagal berkomunikasi dengan layanan AI.");
+    throw new Error(errorMsg || "Gagal berkomunikasi dengan layanan AI.");
   }
 };
