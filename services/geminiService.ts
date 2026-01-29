@@ -2,13 +2,10 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { PaperInput, PaperContent } from "../types";
 
 export const generateAcademicPaper = async (input: PaperInput): Promise<PaperContent> => {
-  const apiKey = (window as any).process?.env?.API_KEY;
-
-  if (!apiKey || apiKey === "undefined" || apiKey === "") {
-    throw new Error("API Key tidak ditemukan. Pastikan variabel API_KEY sudah diatur.");
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
+  // Menginisialisasi client secara langsung menggunakan process.env.API_KEY.
+  // Sesuai pedoman, API Key harus diambil eksklusif dari environment variable.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
   const modelName = input.mode === 'deep' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
   
   const prompt = `Buatkan makalah akademik Bahasa Indonesia lengkap dengan format JSON.
@@ -80,7 +77,8 @@ Struktur JSON harus mencakup:
           },
           required: ["introduction", "chapters", "closing", "bibliography"],
         },
-        thinkingConfig: { thinkingBudget: input.mode === 'deep' ? 10000 : 0 }
+        // Menambahkan thinkingBudget hanya untuk mode 'deep' (Gemini 3 Pro)
+        ...(input.mode === 'deep' ? { thinkingConfig: { thinkingBudget: 15000 } } : {})
       },
     });
 
