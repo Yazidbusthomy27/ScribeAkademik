@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { PaperInput, PaperData } from './types';
 import { generateAcademicPaper } from './services/geminiService';
 import PaperForm from './components/PaperForm';
@@ -9,6 +10,34 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paperData, setPaperData] = useState<PaperData | null>(null);
+  const [hasKey, setHasKey] = useState<boolean>(false);
+
+  // Cek apakah API Key sudah tersedia saat aplikasi dimuat
+  useEffect(() => {
+    const checkKey = async () => {
+      if ((window as any).aistudio) {
+        const connected = await (window as any).aistudio.hasSelectedApiKey();
+        setHasKey(connected);
+      } else if (process.env.API_KEY) {
+        setHasKey(true);
+      }
+    };
+    checkKey();
+  }, []);
+
+  const handleConnectKey = async () => {
+    if ((window as any).aistudio) {
+      try {
+        await (window as any).aistudio.openSelectKey();
+        setHasKey(true);
+        setError(null);
+      } catch (err) {
+        console.error("Gagal membuka pemilihan kunci:", err);
+      }
+    } else {
+      alert("Fitur pemilihan kunci otomatis tidak tersedia di browser ini.");
+    }
+  };
 
   const handleGenerate = async (input: PaperInput) => {
     setLoading(true);
@@ -18,12 +47,14 @@ const App: React.FC = () => {
       setPaperData({ input, content });
     } catch (err: any) {
       console.error("Generate Error:", err);
-      // Menampilkan pesan error yang lebih bersih bagi pengguna
-      const errorMessage = err.message || 'Terjadi kesalahan saat menyusun makalah.';
-      if (errorMessage.includes("API key")) {
-        setError("Kesalahan API Key: Pastikan variabel lingkungan API_KEY telah dikonfigurasi dengan benar di dashboard deployment Anda.");
+      if (err.message?.includes("Requested entity was not found")) {
+        setError("API Key tidak valid atau project tidak ditemukan. Silakan hubungkan ulang.");
+        setHasKey(false);
+      } else if (err.message?.includes("API key")) {
+        setError("API Key belum diset atau tidak valid. Klik tombol 'Hubungkan API Key' di atas.");
+        setHasKey(false);
       } else {
-        setError(errorMessage);
+        setError(err.message || 'Terjadi kesalahan saat menyusun makalah.');
       }
     } finally {
       setLoading(false);
@@ -48,11 +79,6 @@ const App: React.FC = () => {
                 ScribeAkademik
               </span>
             </div>
-            <div className="hidden md:block">
-              <span className="text-sm text-gray-500 italic">
-                Penyusun Makalah Otomatis
-              </span>
-            </div>
           </div>
         </div>
       </nav>
@@ -69,8 +95,34 @@ const App: React.FC = () => {
                 Buat Makalah Akademik AI
               </h1>
               <p className="text-lg text-gray-600">
-                Solusi instan untuk menyusun draf makalah lengkap dengan struktur formal Bahasa Indonesia.
+                Gunakan API Key Anda sendiri untuk hasil yang lebih cepat dan stabil.
               </p>
+            </div>
+
+            {/* API Key Connection Section */}
+            <div className={`mb-8 p-6 rounded-2xl border-2 transition-all ${hasKey ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200 shadow-lg animate-pulse'}`}>
+              <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="flex items-center space-x-4">
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${hasKey ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'}`}>
+                    <i className={`fas ${hasKey ? 'fa-check-circle' : 'fa-key'} text-xl`}></i>
+                  </div>
+                  <div>
+                    <h3 className={`font-bold ${hasKey ? 'text-green-800' : 'text-amber-800'}`}>
+                      {hasKey ? 'Koneksi AI Aktif' : 'Koneksi AI Diperlukan'}
+                    </h3>
+                    <p className={`text-sm ${hasKey ? 'text-green-600' : 'text-amber-600'}`}>
+                      {hasKey ? 'Aplikasi siap digunakan dengan API Key Anda.' : 'Anda perlu menghubungkan API Key Gemini untuk membuat makalah.'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleConnectKey}
+                  className={`px-6 py-2.5 rounded-xl font-bold transition-all flex items-center space-x-2 shadow-sm ${hasKey ? 'bg-white text-green-700 border border-green-200 hover:bg-green-100' : 'bg-amber-600 text-white hover:bg-amber-700'}`}
+                >
+                  <i className="fas fa-plug"></i>
+                  <span>{hasKey ? 'Ganti API Key' : 'Hubungkan API Key'}</span>
+                </button>
+              </div>
             </div>
 
             {error && (
@@ -88,10 +140,8 @@ const App: React.FC = () => {
       </main>
 
       <footer className="bg-white border-t border-gray-200 py-8 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-gray-400 text-sm">
-            &copy; {new Date().getFullYear()} ScribeAkademik AI.
-          </p>
+        <div className="max-w-7xl mx-auto px-4 text-center text-gray-400 text-sm">
+          &copy; {new Date().getFullYear()} ScribeAkademik AI. Gunakan kunci dari <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer" className="underline">Google AI Studio</a>.
         </div>
       </footer>
     </div>

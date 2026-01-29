@@ -1,26 +1,41 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { PaperInput, PaperContent } from "../types";
 
 export const generateAcademicPaper = async (input: PaperInput): Promise<PaperContent> => {
-  // Menginisialisasi client secara langsung menggunakan process.env.API_KEY.
-  // Sesuai pedoman, API Key harus diambil eksklusif dari environment variable.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // Selalu buat instance baru saat dipanggil agar menggunakan API_KEY terbaru dari dialog
+  const apiKey = process.env.API_KEY;
   
-  const modelName = input.mode === 'deep' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
+  if (!apiKey) {
+    throw new Error("API key tidak ditemukan. Harap hubungkan API Key melalui tombol di atas form.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   
-  const prompt = `Buatkan makalah akademik Bahasa Indonesia lengkap dengan format JSON.
+  // Mahasiswa atau mode 'deep' menggunakan Pro, SMP/SMA atau mode 'quick' menggunakan Flash
+  const modelName = (input.educationLevel === 'Mahasiswa' || input.mode === 'deep') 
+    ? 'gemini-3-pro-preview' 
+    : 'gemini-3-flash-preview';
+  
+  const prompt = `Buatkan makalah akademik Bahasa Indonesia lengkap dalam format JSON murni.
 Judul: ${input.title}
 Penulis: ${input.author}
-Instansi: ${input.institution}
-Tingkat: ${input.educationLevel}
-Gaya: ${input.languageStyle}
+Institusi: ${input.institution}
+Mata Kuliah: ${input.subject}
+Tahun: ${input.academicYear}
+Tingkat Pendidikan: ${input.educationLevel}
+Gaya Bahasa: ${input.languageStyle}
 
-Struktur JSON harus mencakup:
-1. preface (Kata Pengantar)
-2. introduction (background, problemFormulation[], objectives[])
-3. chapters (ARRAY of {title, subChapters: ARRAY of {title, content}})
-4. closing (conclusion, suggestions)
-5. bibliography (ARRAY of references)`;
+PENTING:
+- Gunakan Bahasa Indonesia formal akademik (PUEBI).
+- Jika tingkat pendidikan Mahasiswa, berikan pembahasan yang sangat mendalam dan kritis.
+- Struktur JSON harus memiliki:
+  1. preface (Kata Pengantar)
+  2. introduction (background, problemFormulation[], objectives[])
+  3. chapters (Array of {title, subChapters: Array of {title, content}})
+  4. closing (conclusion, suggestions)
+  5. bibliography (Array of references)
+- Jangan berikan teks pembuka/penutup selain JSON.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -77,17 +92,17 @@ Struktur JSON harus mencakup:
           },
           required: ["introduction", "chapters", "closing", "bibliography"],
         },
-        // Menambahkan thinkingBudget hanya untuk mode 'deep' (Gemini 3 Pro)
-        ...(input.mode === 'deep' ? { thinkingConfig: { thinkingBudget: 15000 } } : {})
+        // Alokasikan thinkingBudget lebih besar untuk kualitas akademik yang lebih tinggi
+        thinkingConfig: { thinkingBudget: input.mode === 'deep' ? 20000 : 0 }
       },
     });
 
     const result = response.text;
-    if (!result) throw new Error("AI tidak memberikan respon teks.");
+    if (!result) throw new Error("Model tidak mengembalikan hasil teks.");
     
     return JSON.parse(result.trim());
   } catch (error: any) {
-    console.error("Gemini Service Error:", error);
+    console.error("Gemini API Error:", error);
     throw error;
   }
 };
