@@ -3,26 +3,20 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { PaperInput, PaperContent } from "../types";
 
 export const generateAcademicPaper = async (input: PaperInput): Promise<PaperContent> => {
-  // Pastikan API_KEY tersedia
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error("Konfigurasi API_KEY tidak ditemukan. Jika Anda di Vercel, pastikan Environment Variable API_KEY sudah diatur.");
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
+  // Inisialisasi SDK menggunakan process.env.API_KEY.
+  // Platform (seperti preview ini) akan menangani pengisian nilainya.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const isDeep = input.mode === 'deep';
   
-  const prompt = `Buatkan konten makalah akademik Bahasa Indonesia yang sangat lengkap dan mendalam.
+  const prompt = `Buatkan makalah akademik Bahasa Indonesia lengkap.
     Judul: ${input.title}
-    Tingkat Pendidikan: ${input.educationLevel}
-    Gaya Bahasa: ${input.languageStyle}
-    Mode: ${isDeep ? 'Mendalam' : 'Cepat'}
+    Penulis: ${input.author}
+    Instansi: ${input.institution}
+    Tingkat: ${input.educationLevel}
+    Gaya: ${input.languageStyle}
     
-    Persyaratan:
-    1. Bahasa Indonesia formal sesuai PUEBI.
-    2. Struktur makalah standar (Latar Belakang, Rumusan, Tujuan, Pembahasan, Penutup).
-    3. Daftar Pustaka minimal 5 sumber kredibel.
-    4. Sub-bab di Bab II harus minimal 3 topik berbeda.`;
+    Struktur: Kata Pengantar, BAB I (Latar Belakang, Rumusan, Tujuan), BAB II (Pembahasan mendalam minimal 3 sub-bab), BAB III (Kesimpulan, Saran), Daftar Pustaka.
+    Bahasa: Indonesia Formal (PUEBI).`;
 
   try {
     const response = await ai.models.generateContent({
@@ -57,9 +51,11 @@ export const generateAcademicPaper = async (input: PaperInput): Promise<PaperCon
                         title: { type: Type.STRING },
                         content: { type: Type.STRING },
                       },
+                      required: ["title", "content"]
                     },
                   },
                 },
+                required: ["title", "subChapters"]
               },
             },
             closing: {
@@ -68,6 +64,7 @@ export const generateAcademicPaper = async (input: PaperInput): Promise<PaperCon
                 conclusion: { type: Type.STRING },
                 suggestions: { type: Type.STRING },
               },
+              required: ["conclusion", "suggestions"]
             },
             bibliography: {
               type: Type.ARRAY,
@@ -80,12 +77,12 @@ export const generateAcademicPaper = async (input: PaperInput): Promise<PaperCon
       },
     });
 
-    const text = response.text;
-    if (!text) throw new Error("AI mengembalikan respon kosong.");
+    const result = response.text;
+    if (!result) throw new Error("AI tidak memberikan respon teks.");
     
-    return JSON.parse(text);
+    return JSON.parse(result);
   } catch (error) {
-    console.error("Gemini Error:", error);
-    throw new Error("Gagal generate makalah. Silakan cek koneksi atau API Key Anda.");
+    console.error("Gemini Generation Error:", error);
+    throw error;
   }
 };
