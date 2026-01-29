@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -13,10 +14,16 @@
         .font-serif-academic { font-family: 'Times New Roman', Times, serif; }
         #root { min-height: 100vh; display: flex; flex-direction: column; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
+        }
+        .animate-shake { animation: shake 0.3s ease-in-out; }
     </style>
     <script>
         // Polyfill global process untuk lingkungan browser ESM
-        window.process = window.process || { env: {} };
+        window.process = window.process || { env: { API_KEY: "" } };
     </script>
     <script type="importmap">
     {

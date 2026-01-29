@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PaperInput, PaperData, EducationLevel, LanguageStyle } from './types';
 import { generateAcademicPaper } from './services/geminiService';
 import PaperForm from './components/PaperForm';
@@ -10,6 +10,39 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paperData, setPaperData] = useState<PaperData | null>(null);
+  const [needsKey, setNeedsKey] = useState(false);
+
+  useEffect(() => {
+    const checkApiKey = async () => {
+      // Prioritaskan API_KEY dari environment
+      if (process.env.API_KEY && process.env.API_KEY !== "") {
+        setNeedsKey(false);
+        return;
+      }
+
+      // Jika tidak ada di env, periksa apakah sudah dipilih via dialog aistudio
+      if (window.aistudio) {
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        if (!hasKey) {
+          setNeedsKey(true);
+        }
+      } else {
+        // Jika bukan di lingkungan aistudio dan env kosong, kita tetap tampilkan form 
+        // tapi kemungkinan akan error saat generate.
+        setNeedsKey(false);
+      }
+    };
+
+    checkApiKey();
+  }, []);
+
+  const handleConnectKey = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+      // Asumsikan pemilihan berhasil sesuai panduan race condition
+      setNeedsKey(false);
+    }
+  };
 
   const handleGenerate = async (input: PaperInput) => {
     setLoading(true);
@@ -18,7 +51,13 @@ const App: React.FC = () => {
       const content = await generateAcademicPaper(input);
       setPaperData({ input, content });
     } catch (err: any) {
-      setError(err.message || 'Terjadi kesalahan saat memproses data.');
+      console.error(err);
+      if (err.message?.includes("Requested entity was not found")) {
+        setError("API Key tidak valid atau project tidak ditemukan. Mohon pilih kunci kembali.");
+        setNeedsKey(true);
+      } else {
+        setError(err.message || 'Terjadi kesalahan saat memproses data.');
+      }
     } finally {
       setLoading(false);
     }
@@ -29,9 +68,34 @@ const App: React.FC = () => {
     setError(null);
   };
 
+  if (needsKey) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-10 text-center border border-slate-100">
+          <div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <i className="fas fa-key text-3xl"></i>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 mb-3">Siapkan ScribeAkademik</h1>
+          <p className="text-slate-600 mb-8 leading-relaxed">
+            Untuk menggunakan model AI Gemini 3 Pro, Anda perlu menghubungkan API Key dari Google AI Studio (Project Berbayar).
+          </p>
+          <button
+            onClick={handleConnectKey}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center space-x-3 mb-4"
+          >
+            <span>Hubungkan API Key</span>
+            <i className="fas fa-external-link-alt text-sm"></i>
+          </button>
+          <p className="text-xs text-slate-400 italic">
+            Pelajari tentang <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noreferrer" className="underline text-blue-500">penagihan API Gemini</a>.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Navbar */}
       <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
@@ -69,7 +133,7 @@ const App: React.FC = () => {
             </div>
 
             {error && (
-              <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-center">
+              <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-center animate-shake">
                 <i className="fas fa-exclamation-triangle mr-3"></i>
                 <p>{error}</p>
               </div>

@@ -1,19 +1,10 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { PaperInput, PaperContent } from "../types";
 
 export const generateAcademicPaper = async (input: PaperInput): Promise<PaperContent> => {
-  // Ambil API_KEY dari environment variable
-  const apiKey = process.env.API_KEY;
-
-  // Jika kunci tidak ada, berikan pesan error yang membantu pengguna melakukan debug di Vercel
-  if (!apiKey || apiKey.trim() === "") {
-    throw new Error(
-      "API_KEY tidak terdeteksi. Pastikan Anda telah menambahkan Environment Variable 'API_KEY' di dasbor Vercel dan melakukan 'Redeploy' agar kunci tersebut dapat diakses oleh aplikasi."
-    );
-  }
-
-  // Inisialisasi AI dengan kunci yang sudah tervalidasi
-  const ai = new GoogleGenAI({ apiKey });
+  // Inisialisasi GoogleGenAI baru tepat sebelum pemanggilan untuk memastikan kunci terbaru digunakan
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   // Pilih model berdasarkan mode (Mendalam vs Cepat)
   const modelName = input.mode === 'deep' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
@@ -82,6 +73,7 @@ export const generateAcademicPaper = async (input: PaperInput): Promise<PaperCon
           },
           required: ["introduction", "chapters", "closing", "bibliography"],
         },
+        // Alokasikan thinkingBudget untuk model Pro agar hasil lebih berkualitas
         thinkingConfig: { thinkingBudget: input.mode === 'deep' ? 10000 : 0 }
       },
     });
@@ -92,9 +84,6 @@ export const generateAcademicPaper = async (input: PaperInput): Promise<PaperCon
     return JSON.parse(result.trim());
   } catch (error: any) {
     console.error("Gemini Error:", error);
-    if (error.message?.includes("API key")) {
-      throw new Error("Kunci API tidak valid. Periksa kembali API_KEY yang Anda masukkan di Vercel.");
-    }
-    throw new Error(`Gagal membuat makalah: ${error.message || "Kesalahan tidak dikenal"}`);
+    throw error; // Biarkan komponen UI menangani error dengan informasi yang sesuai
   }
 };
