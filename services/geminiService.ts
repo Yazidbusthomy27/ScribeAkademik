@@ -2,27 +2,30 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { PaperInput, PaperContent } from "../types";
 
 export const generateAcademicPaper = async (input: PaperInput): Promise<PaperContent> => {
-  // Inisialisasi menggunakan API key dari environment variable secara eksklusif.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // Ambil API_KEY dari environment variable
+  const apiKey = process.env.API_KEY;
+
+  // Jika kunci tidak ada, berikan pesan error yang membantu pengguna melakukan debug di Vercel
+  if (!apiKey || apiKey.trim() === "") {
+    throw new Error(
+      "API_KEY tidak terdeteksi. Pastikan Anda telah menambahkan Environment Variable 'API_KEY' di dasbor Vercel dan melakukan 'Redeploy' agar kunci tersebut dapat diakses oleh aplikasi."
+    );
+  }
+
+  // Inisialisasi AI dengan kunci yang sudah tervalidasi
+  const ai = new GoogleGenAI({ apiKey });
   
-  // Pilih model berdasarkan kompleksitas tugas.
+  // Pilih model berdasarkan mode (Mendalam vs Cepat)
   const modelName = input.mode === 'deep' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
   
-  const prompt = `Buatkan makalah akademik Bahasa Indonesia lengkap dan mendalam.
+  const prompt = `Buatkan makalah akademik Bahasa Indonesia lengkap dengan format JSON.
     Judul: ${input.title}
     Penulis: ${input.author}
     Instansi: ${input.institution}
-    Mata Pelajaran/Kuliah: ${input.subject}
     Tingkat: ${input.educationLevel}
-    Gaya Bahasa: ${input.languageStyle}
     
-    Persyaratan Teknis:
-    1. Gunakan Bahasa Indonesia formal sesuai PUEBI.
-    2. Struktur harus terdiri dari: Kata Pengantar, BAB I (Latar Belakang, Rumusan, Tujuan), BAB II (Pembahasan komprehensif dengan sub-bab dinamis), BAB III (Kesimpulan & Saran), dan Daftar Pustaka.
-    3. Paragraf harus rapi (3-4 kalimat per paragraf).
-    4. Konten harus orisinal, ilmiah, dan tanpa opini pribadi.
-    
-    Output harus dalam format JSON sesuai skema yang diminta.`;
+    Makalah harus memiliki: Kata Pengantar, BAB I (Latar Belakang, Rumusan, Tujuan), BAB II (Pembahasan mendalam), BAB III (Kesimpulan & Saran), dan Daftar Pustaka.
+    Bahasa: Formal Indonesia (PUEBI).`;
 
   try {
     const response = await ai.models.generateContent({
@@ -33,13 +36,13 @@ export const generateAcademicPaper = async (input: PaperInput): Promise<PaperCon
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            preface: { type: Type.STRING, description: "Teks kata pengantar yang formal" },
+            preface: { type: Type.STRING },
             introduction: {
               type: Type.OBJECT,
               properties: {
-                background: { type: Type.STRING, description: "Latar belakang masalah yang mendalam" },
-                problemFormulation: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Daftar pertanyaan rumusan masalah" },
-                objectives: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Daftar tujuan penulisan" },
+                background: { type: Type.STRING },
+                problemFormulation: { type: Type.ARRAY, items: { type: Type.STRING } },
+                objectives: { type: Type.ARRAY, items: { type: Type.STRING } },
               },
               required: ["background", "problemFormulation", "objectives"],
             },
@@ -48,7 +51,7 @@ export const generateAcademicPaper = async (input: PaperInput): Promise<PaperCon
               items: {
                 type: Type.OBJECT,
                 properties: {
-                  title: { type: Type.STRING, description: "Judul bab pembahasan" },
+                  title: { type: Type.STRING },
                   subChapters: {
                     type: Type.ARRAY,
                     items: {
@@ -63,35 +66,35 @@ export const generateAcademicPaper = async (input: PaperInput): Promise<PaperCon
                 },
                 required: ["title", "subChapters"]
               },
-              description: "Minimal berisi 1 bab utama (BAB II) dengan beberapa sub-bab"
             },
             closing: {
               type: Type.OBJECT,
               properties: {
-                conclusion: { type: Type.STRING, description: "Kesimpulan menyeluruh" },
-                suggestions: { type: Type.STRING, description: "Saran akademik" },
+                conclusion: { type: Type.STRING },
+                suggestions: { type: Type.STRING },
               },
               required: ["conclusion", "suggestions"]
             },
             bibliography: {
               type: Type.ARRAY,
-              items: { type: Type.STRING },
-              description: "Daftar pustaka format standar"
+              items: { type: Type.STRING }
             },
           },
           required: ["introduction", "chapters", "closing", "bibliography"],
         },
-        // Memberikan budget berpikir untuk model Pro agar hasil lebih berkualitas.
         thinkingConfig: { thinkingBudget: input.mode === 'deep' ? 10000 : 0 }
       },
     });
 
     const result = response.text;
-    if (!result) throw new Error("AI tidak mengembalikan teks konten.");
+    if (!result) throw new Error("AI tidak memberikan respon teks.");
     
     return JSON.parse(result.trim());
   } catch (error: any) {
-    console.error("Gemini Service Error:", error);
-    throw new Error(`Gagal membuat makalah: ${error.message || "Kesalahan internal AI. Pastikan variabel API_KEY sudah dikonfigurasi dengan benar di dashboard deployment Anda."}`);
+    console.error("Gemini Error:", error);
+    if (error.message?.includes("API key")) {
+      throw new Error("Kunci API tidak valid. Periksa kembali API_KEY yang Anda masukkan di Vercel.");
+    }
+    throw new Error(`Gagal membuat makalah: ${error.message || "Kesalahan tidak dikenal"}`);
   }
 };
