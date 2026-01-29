@@ -14,10 +14,36 @@
         .paper-shadow { box-shadow: 0 0 20px rgba(0,0,0,0.1); }
         #root { min-height: 100vh; display: flex; flex-direction: column; }
         @media print { .no-print { display: none; } }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
     <script>
-        // Mencegah "ReferenceError: process is not defined" di browser
-        window.process = window.process || { env: { API_KEY: "" } };
+        // Polyfill sangat kuat untuk process.env agar aplikasi tidak crash di browser
+        window.process = window.process || {};
+        window.process.env = window.process.env || {};
+        if (typeof window.process.env.API_KEY === 'undefined') {
+            window.process.env.API_KEY = "";
+        }
+
+        // Penangan error global untuk mendiagnosis layar kosong
+        window.addEventListener('error', function(event) {
+            const root = document.getElementById('root');
+            if (root && (root.innerHTML.includes('Menghubungkan') || root.innerHTML.trim() === '')) {
+                root.innerHTML = `
+                    <div style="padding: 30px; color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 12px; margin: 40px auto; max-width: 600px; font-family: sans-serif; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center;">
+                        <i class="fas fa-exclamation-circle" style="font-size: 40px; margin-bottom: 15px;"></i>
+                        <h3 style="margin-top: 0; font-size: 20px;">Gagal Memuat Aplikasi</h3>
+                        <p style="font-size: 15px; line-height: 1.5; color: #666;">Terjadi kesalahan teknis saat menginisialisasi modul AI. Hal ini biasanya disebabkan oleh masalah koneksi library atau konfigurasi browser.</p>
+                        <div style="font-size: 11px; white-space: pre-wrap; background: rgba(0,0,0,0.05); padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid rgba(0,0,0,0.1); font-family: monospace; text-align: left; overflow-x: auto;">
+                            Error: ${event.message}<br>
+                            Source: ${event.filename}
+                        </div>
+                        <button onclick="window.location.reload()" style="background: #2563eb; color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s;">
+                            Segarkan Halaman
+                        </button>
+                    </div>
+                `;
+            }
+        });
     </script>
     <script type="importmap">
 {
@@ -32,12 +58,15 @@
   }
 }
 </script>
+    <!-- Explicitly load index.tsx as a module -->
+    <script type="module" src="./index.tsx"></script>
 </head>
 <body class="bg-gray-50 text-gray-900">
     <div id="root">
-        <!-- Fallback sederhana saat loading JS -->
-        <div style="display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; color: #666;">
-            Memuat ScribeAkademik...
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: 'Inter', sans-serif; color: #666; text-align: center; padding: 20px;">
+            <div style="border: 4px solid #f3f3f3; border-top: 4px solid #2563eb; border-radius: 50%; width: 45px; height: 45px; animation: spin 1s linear infinite; margin-bottom: 25px;"></div>
+            <h2 style="margin: 0; color: #1e40af; font-size: 24px; font-weight: 700;">ScribeAkademik</h2>
+            <p style="margin-top: 10px; font-size: 16px; color: #4b5563;">Menyiapkan lingkungan kerja AI...</p>
         </div>
     </div>
 </body>
