@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { PaperInput, PaperContent } from "../types";
 
@@ -10,41 +11,34 @@ export const generateAcademicPaper = async (input: PaperInput, customApiKey: str
 
   const ai = new GoogleGenAI({ apiKey });
   
-  /**
-   * MENGAPA MENGGUNAKAN FLASH?
-   * Model 'gemini-3-flash-preview' memiliki kuota (Rate Limit) yang jauh lebih tinggi pada Free Tier 
-   * dibandingkan model Pro. Ini mencegah error 'Resource Exhausted' atau 'Quota Exceeded' 
-   * yang sering dialami pengguna akun gratis.
-   */
+  // Menggunakan model Flash untuk kecepatan dan kuota yang lebih stabil
   const modelName = 'gemini-3-flash-preview';
 
-  const systemInstruction = `Anda adalah seorang Penulis Akademik Senior dan Profesor di Indonesia yang ahli dalam menyusun draf makalah ilmiah tingkat tinggi.
-Tugas Anda adalah menulis makalah yang SANGAT PANJANG, DETAIL, dan KOMPREHENSIF.
+  const isDeepMode = input.mode === 'deep';
 
-ATURAN KETAT PENULISAN:
-1. PANJANG KONTEN (WAJIB):
-   - Latar Belakang (Bab I): Tulis minimal 8-10 paragraf panjang. Uraikan fenomena secara makro ke mikro.
-   - Pembahasan (Bab II): Harus terdiri dari minimal 4 sub-bab utama. Setiap sub-bab WAJIB memiliki penjelasan minimal 5-7 paragraf analitis yang panjang.
-   - Penutup (Bab III): Kesimpulan harus merangkum seluruh esensi materi secara mendalam.
-2. BAHASA: Gunakan Bahasa Indonesia Baku (PUEBI/EYD) dengan diksi akademik tingkat tinggi.
-3. KUALITAS: Berikan argumen yang logis dan analisis kritis. Jangan hanya memberikan definisi dasar.
-4. FORMAT: Output harus JSON murni tanpa narasi tambahan.
+  const systemInstruction = `Anda adalah seorang Profesor Senior dan Penulis Akademik Terkemuka di Indonesia. 
+Tugas Anda adalah menulis draf makalah ilmiah yang SANGAT DETAIL, LUAS, dan MENDALAM.
 
-Struktur JSON:
-- preface: Kata pengantar formal.
-- introduction: { background, problemFormulation, objectives }.
-- chapters: Array of { title, subChapters: array of { title, content } }.
-- closing: { conclusion, suggestions }.
-- bibliography: Minimal 10 referensi format APA Style.`;
+ATURAN KETAT PENULISAN (WAJIB):
+1. VOLUME KONTEN: 
+   - Latar Belakang: Harus sangat luas. Minimal 800-1000 kata. Uraikan dari sejarah, fenomena global, hingga kondisi spesifik di Indonesia.
+   - Pembahasan (Bab II): Harus terdiri dari minimal 4 sub-bab utama yang komprehensif. 
+   - Tiap Sub-Bab: Minimal 600-800 kata per sub-bab. Jangan gunakan poin-poin (bullet points), gunakan paragraf analitis yang panjang dan mengalir.
+2. KUALITAS BAHASA: Gunakan Bahasa Indonesia Baku (PUEBI/EYD) tingkat tinggi. Hindari pengulangan kalimat.
+3. ANALISIS: Jangan hanya memberikan definisi. Berikan sintesis, komparasi teori, dan analisis kritis yang tajam.
+4. PERSONA: Bertindaklah seolah-olah Anda sedang menyusun skripsi atau tesis yang sangat berkualitas.
+5. FORMAT: Output harus JSON murni. Jangan tambahkan teks apapun di luar blok JSON.
 
-  const prompt = `Buatkan MAKALAH AKADEMIK LENGKAP DAN SANGAT PANJANG dengan judul: "${input.title}".
-Tingkat Pendidikan: ${input.educationLevel}.
-Mode: ${input.mode === 'deep' ? 'Mendalam/Komprehensif (Prioritaskan detail dan jumlah kata yang banyak)' : 'Standar'}.
+TINGKAT PENDIDIKAN: ${input.educationLevel}. Sesuaikan kedalaman teori dengan level ini.`;
 
-Instruksi Khusus:
-- Perbanyak narasi pada setiap sub-bab.
-- Berikan analisis yang tajam dan mendalam untuk setiap poin pembahasan.
-- Pastikan draf ini terasa seperti karya tulis mahasiswa tingkat akhir atau peneliti profesional.`;
+  const prompt = `Buatkan MAKALAH LENGKAP dengan judul: "${input.title}".
+MODE: ${isDeepMode ? 'MENDALAM & SANGAT PANJANG (WAJIB LEBIH DARI 3000 KATA)' : 'STANDAR'}.
+
+Instruksi Khusus untuk Bab II:
+- Jangan meringkas materi. 
+- Jabarkan setiap sub-topik secara ekstensif.
+- Masukkan pandangan ahli dan data-data pendukung dalam bentuk narasi paragraf.
+- Pastikan setiap paragraf berisi minimal 4-6 kalimat kompleks.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -56,18 +50,33 @@ Instruksi Khusus:
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            preface: { type: Type.STRING },
+            preface: { 
+              type: Type.STRING, 
+              description: "Kata pengantar formal yang panjang dan menyentuh (min 200 kata)." 
+            },
             introduction: {
               type: Type.OBJECT,
               properties: {
-                background: { type: Type.STRING },
-                problemFormulation: { type: Type.ARRAY, items: { type: Type.STRING } },
-                objectives: { type: Type.ARRAY, items: { type: Type.STRING } },
+                background: { 
+                  type: Type.STRING, 
+                  description: "Latar belakang masalah yang sangat panjang, luas, dan mendalam (min 1000 kata)." 
+                },
+                problemFormulation: { 
+                  type: Type.ARRAY, 
+                  items: { type: Type.STRING },
+                  description: "3-5 rumusan masalah yang tajam."
+                },
+                objectives: { 
+                  type: Type.ARRAY, 
+                  items: { type: Type.STRING },
+                  description: "Tujuan penulisan yang sinkron dengan rumusan masalah."
+                },
               },
               required: ["background", "problemFormulation", "objectives"],
             },
             chapters: {
               type: Type.ARRAY,
+              description: "Minimal 4 sub-bab pembahasan yang sangat detail.",
               items: {
                 type: Type.OBJECT,
                 properties: {
@@ -78,7 +87,10 @@ Instruksi Khusus:
                       type: Type.OBJECT,
                       properties: {
                         title: { type: Type.STRING },
-                        content: { type: Type.STRING },
+                        content: { 
+                          type: Type.STRING, 
+                          description: "Konten analisis yang sangat panjang, minimal 600 kata per sub-bab." 
+                        },
                       },
                       required: ["title", "content"]
                     },
@@ -90,20 +102,29 @@ Instruksi Khusus:
             closing: {
               type: Type.OBJECT,
               properties: {
-                conclusion: { type: Type.STRING },
-                suggestions: { type: Type.STRING },
+                conclusion: { 
+                  type: Type.STRING, 
+                  description: "Kesimpulan komprehensif yang panjang (min 400 kata)." 
+                },
+                suggestions: { 
+                  type: Type.STRING, 
+                  description: "Saran praktis dan akademis yang mendetail." 
+                },
               },
               required: ["conclusion", "suggestions"]
             },
             bibliography: {
               type: Type.ARRAY,
-              items: { type: Type.STRING }
+              items: { type: Type.STRING },
+              description: "Daftar pustaka minimal 10 referensi akademik terbaru format APA."
             },
           },
           required: ["introduction", "chapters", "closing", "bibliography"],
         },
-        // Tetap gunakan thinking budget agar model Flash berpikir lebih dalam sebelum menulis
-        thinkingConfig: { thinkingBudget: input.mode === 'deep' ? 24576 : 12000 }
+        // Memberikan thinking budget menengah agar model tidak 503 tapi tetap berencana menulis panjang
+        thinkingConfig: { 
+          thinkingBudget: isDeepMode ? 16000 : 0 
+        }
       },
     });
 
@@ -114,9 +135,12 @@ Instruksi Khusus:
   } catch (error: any) {
     console.error("Gemini Error:", error);
     const errorMsg = error.message || "";
-    if (errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED")) {
-      throw new Error("Batas penggunaan API (Quota) tercapai. Hal ini biasa terjadi pada API Key gratis. Silakan tunggu 1-2 menit sebelum mencoba lagi, atau gunakan API Key yang sudah terhubung dengan penagihan (Pay-as-you-go) untuk batas yang lebih besar.");
+    if (errorMsg.includes("503") || errorMsg.includes("overloaded")) {
+      throw new Error("Layanan AI sedang sangat sibuk karena permintaan penulisan panjang. Silakan coba lagi dalam 30 detik atau gunakan mode 'Kilat'.");
     }
-    throw new Error(errorMsg || "Gagal berkomunikasi dengan layanan AI.");
+    if (errorMsg.includes("429") || errorMsg.includes("RESOURCE_EXHAUSTED")) {
+      throw new Error("Kuota API tercapai. Mohon tunggu sejenak atau gunakan API Key lain.");
+    }
+    throw new Error(errorMsg || "Gagal menyusun makalah panjang. Periksa koneksi Anda.");
   }
 };

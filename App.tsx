@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { PaperInput, PaperData } from './types';
 import { generateAcademicPaper } from './services/geminiService';
@@ -44,9 +45,11 @@ const App: React.FC = () => {
       console.error("Generate Error:", err);
       const msg = err.message || "";
       if (msg.includes("API_KEY_INVALID") || msg.includes("not found") || msg.includes("401") || msg.includes("403")) {
-        setError("API Key tidak valid atau tidak memiliki izin. Periksa kembali kunci Anda.");
+        setError("API Key tidak valid. Periksa kembali kunci Anda di Google AI Studio.");
       } else if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED")) {
-        setError("Kuota API Key Anda telah habis. Hal ini terjadi karena batas penggunaan model (misal: Gemini 3 Pro) pada akun gratis telah terlampaui. Silakan tunggu beberapa saat atau gunakan API Key lain.");
+        setError("Kuota API harian Anda telah habis. Silakan tunggu beberapa saat atau gunakan API Key lain.");
+      } else if (msg.includes("503") || msg.includes("overloaded")) {
+        setError("Server AI sedang padat (Overloaded). Silakan coba lagi dalam 30 detik atau gunakan mode 'Kilat'.");
       } else {
         setError(msg || 'Terjadi kesalahan sistem saat menyusun makalah.');
       }
