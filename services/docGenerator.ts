@@ -1,47 +1,47 @@
-
 import { 
   Document, 
   Packer, 
   Paragraph, 
   TextRun, 
   AlignmentType, 
-  PageBreak
+  PageBreak,
+  HeadingLevel
 } from "docx";
 import { PaperData } from "../types";
 
 /**
- * Pembersihan karakter ilegal untuk standar OOXML (Open Office XML).
- * Menghapus karakter kontrol non-ASCII yang sering merusak struktur file Word.
+ * Pembersihan karakter ilegal untuk standar OOXML.
  */
 const safeXmlStr = (input: any): string => {
   if (!input) return "";
   const str = String(input);
-  // Filter karakter kontrol (00-1F) kecuali tab(09), LF(0A), CR(0D)
-  // Dan hapus karakter di luar rentang valid XML 1.0
   return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x84\x86-\x9F]/g, "")
             .replace(/[^\u0009\u000A\u000D\u0020-\uD7FF\uE000-\uFFFD]/g, "");
 };
 
 const sanitizeFile = (name: string): string => {
-  return name.replace(/[^a-z0-9]/gi, '_').substring(0, 40) || 'Makalah';
+  return name.replace(/[^a-z0-9]/gi, '_').substring(0, 50) || 'Makalah';
 };
 
 const makePageBreak = () => new Paragraph({ children: [new PageBreak()] });
 
-const buildParagraphs = (text: string | undefined, isBold = false) => {
+// Spasi 1.5 dalam docx library adalah 360 (1 line = 240, 1.5 = 240 * 1.5)
+const LINE_SPACING = 360;
+
+const buildParagraphs = (text: string | undefined) => {
   if (!text) return [];
   return text.split('\n')
     .map(t => safeXmlStr(t.trim()))
     .filter(t => t.length > 0)
     .map(t => new Paragraph({
       alignment: AlignmentType.JUSTIFIED,
-      spacing: { line: 360, before: 100, after: 100 },
+      spacing: { line: LINE_SPACING, before: 120, after: 120 },
+      indent: { firstLine: 450 }, // Indentasi paragraf pertama
       children: [
         new TextRun({
           text: t,
           font: "Times New Roman",
-          size: 24,
-          bold: isBold
+          size: 24, // 12pt
         }),
       ],
     }));
@@ -53,18 +53,18 @@ export const downloadAsDocx = async (data: PaperData) => {
   try {
     const nodes: Paragraph[] = [];
 
-    // --- COVER ---
+    // --- COVER (Halaman 1) ---
     nodes.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [new TextRun({ text: "MAKALAH", bold: true, size: 28, font: "Times New Roman" })],
       }),
-      new Paragraph({ spacing: { before: 600 } }),
+      new Paragraph({ spacing: { before: 1000 } }),
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [new TextRun({ text: safeXmlStr(input.title).toUpperCase(), bold: true, size: 32, font: "Times New Roman" })],
       }),
-      new Paragraph({ spacing: { before: 1800 } }),
+      new Paragraph({ spacing: { before: 3000 } }),
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [new TextRun({ text: "Disusun Oleh:", font: "Times New Roman", size: 24 })],
@@ -73,14 +73,18 @@ export const downloadAsDocx = async (data: PaperData) => {
         alignment: AlignmentType.CENTER,
         children: [new TextRun({ text: safeXmlStr(input.author), bold: true, font: "Times New Roman", size: 28 })],
       }),
-      new Paragraph({ spacing: { before: 2000 } }),
+      new Paragraph({ spacing: { before: 3000 } }),
       new Paragraph({
         alignment: AlignmentType.CENTER,
         children: [new TextRun({ text: safeXmlStr(input.institution).toUpperCase(), bold: true, font: "Times New Roman", size: 28 })],
       }),
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: `${safeXmlStr(input.subject)} - ${safeXmlStr(input.academicYear)}`, font: "Times New Roman", size: 24 })],
+        children: [new TextRun({ text: `${safeXmlStr(input.subject)}`, font: "Times New Roman", size: 24 })],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        children: [new TextRun({ text: `${safeXmlStr(input.academicYear)}`, font: "Times New Roman", size: 24 })],
       }),
       makePageBreak()
     );
@@ -90,6 +94,7 @@ export const downloadAsDocx = async (data: PaperData) => {
       nodes.push(
         new Paragraph({
           alignment: AlignmentType.CENTER,
+          spacing: { after: 400 },
           children: [new TextRun({ text: "KATA PENGANTAR", bold: true, size: 28, font: "Times New Roman" })],
         }),
         ...buildParagraphs(content.preface),
@@ -97,59 +102,91 @@ export const downloadAsDocx = async (data: PaperData) => {
       );
     }
 
-    // --- BAB I ---
+    // --- BAB I PENDAHULUAN ---
     nodes.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        children: [new TextRun({ text: "BAB I: PENDAHULUAN", bold: true, size: 28, font: "Times New Roman" })],
+        spacing: { after: 200 },
+        children: [new TextRun({ text: "BAB I", bold: true, size: 28, font: "Times New Roman" })],
       }),
-      new Paragraph({ children: [new TextRun({ text: "1.1 Latar Belakang", bold: true, font: "Times New Roman", size: 24 })] }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 600 },
+        children: [new TextRun({ text: "PENDAHULUAN", bold: true, size: 28, font: "Times New Roman" })],
+      }),
+      new Paragraph({ spacing: { line: LINE_SPACING }, children: [new TextRun({ text: "1.1 Latar Belakang", bold: true, font: "Times New Roman", size: 24 })] }),
       ...buildParagraphs(content.introduction.background),
-      new Paragraph({ children: [new TextRun({ text: "1.2 Rumusan Masalah", bold: true, font: "Times New Roman", size: 24 })] }),
+      new Paragraph({ spacing: { line: LINE_SPACING, before: 200 }, children: [new TextRun({ text: "1.2 Rumusan Masalah", bold: true, font: "Times New Roman", size: 24 })] }),
       ...(content.introduction.problemFormulation || []).map((q, i) => new Paragraph({
         alignment: AlignmentType.JUSTIFIED,
+        spacing: { line: LINE_SPACING, before: 100 },
         children: [new TextRun({ text: `${i+1}. ${safeXmlStr(q)}`, font: "Times New Roman", size: 24 })]
       })),
-      new Paragraph({ children: [new TextRun({ text: "1.3 Tujuan", bold: true, font: "Times New Roman", size: 24 })] }),
+      new Paragraph({ spacing: { line: LINE_SPACING, before: 200 }, children: [new TextRun({ text: "1.3 Tujuan", bold: true, font: "Times New Roman", size: 24 })] }),
       ...(content.introduction.objectives || []).map((o, i) => new Paragraph({
         alignment: AlignmentType.JUSTIFIED,
+        spacing: { line: LINE_SPACING, before: 100 },
         children: [new TextRun({ text: `${i+1}. ${safeXmlStr(o)}`, font: "Times New Roman", size: 24 })]
       })),
       makePageBreak()
     );
 
-    // --- BAB II ---
-    if (content.chapters) {
+    // --- BAB II PEMBAHASAN ---
+    if (content.chapters && content.chapters.length > 0) {
+      nodes.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 200 },
+          children: [new TextRun({ text: "BAB II", bold: true, size: 28, font: "Times New Roman" })],
+        }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 600 },
+          children: [new TextRun({ text: "PEMBAHASAN", bold: true, size: 28, font: "Times New Roman" })],
+        })
+      );
+
       content.chapters.forEach((ch, idx) => {
+        // Jika ada sub-bab, judul bab utama tidak perlu ditampilkan berulang jika sudah ada BAB II di atas
+        // Namun kita tampilkan judul ch.title sebagai sub-judul utama jika BAB II
         nodes.push(
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            children: [new TextRun({ text: `BAB II: ${safeXmlStr(ch.title).toUpperCase()}`, bold: true, size: 28, font: "Times New Roman" })],
+          new Paragraph({ 
+            spacing: { line: LINE_SPACING, before: 200, after: 100 },
+            children: [new TextRun({ text: `${2}.${idx+1} ${safeXmlStr(ch.title)}`, bold: true, font: "Times New Roman", size: 24 })] 
           })
         );
         ch.subChapters?.forEach((sub, sIdx) => {
           nodes.push(
-            new Paragraph({ children: [new TextRun({ text: `2.${sIdx + 1} ${safeXmlStr(sub.title)}`, bold: true, font: "Times New Roman", size: 24 })] }),
+            new Paragraph({ 
+              spacing: { line: LINE_SPACING, before: 150, after: 80 },
+              children: [new TextRun({ text: `${2}.${idx+1}.${sIdx + 1} ${safeXmlStr(sub.title)}`, bold: true, font: "Times New Roman", size: 24 })] 
+            }),
             ...buildParagraphs(sub.content)
           );
         });
-        nodes.push(makePageBreak());
       });
+      nodes.push(makePageBreak());
     }
 
-    // --- BAB III ---
+    // --- BAB III PENUTUP ---
     if (input.includeClosing && content.closing) {
       nodes.push(
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          children: [new TextRun({ text: "BAB III: PENUTUP", bold: true, size: 28, font: "Times New Roman" })],
+          spacing: { after: 200 },
+          children: [new TextRun({ text: "BAB III", bold: true, size: 28, font: "Times New Roman" })],
         }),
-        new Paragraph({ children: [new TextRun({ text: "3.1 Kesimpulan", bold: true, font: "Times New Roman", size: 24 })] }),
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 600 },
+          children: [new TextRun({ text: "PENUTUP", bold: true, size: 28, font: "Times New Roman" })],
+        }),
+        new Paragraph({ spacing: { line: LINE_SPACING }, children: [new TextRun({ text: "3.1 Kesimpulan", bold: true, font: "Times New Roman", size: 24 })] }),
         ...buildParagraphs(content.closing.conclusion),
-        new Paragraph({ children: [new TextRun({ text: "3.2 Saran", bold: true, font: "Times New Roman", size: 24 })] }),
-        ...buildParagraphs(content.closing.suggestions)
+        new Paragraph({ spacing: { line: LINE_SPACING, before: 200 }, children: [new TextRun({ text: "3.2 Saran", bold: true, font: "Times New Roman", size: 24 })] }),
+        ...buildParagraphs(content.closing.suggestions),
+        makePageBreak()
       );
-      if (input.includeBibliography) nodes.push(makePageBreak());
     }
 
     // --- DAFTAR PUSTAKA ---
@@ -157,11 +194,13 @@ export const downloadAsDocx = async (data: PaperData) => {
       nodes.push(
         new Paragraph({
           alignment: AlignmentType.CENTER,
+          spacing: { after: 600 },
           children: [new TextRun({ text: "DAFTAR PUSTAKA", bold: true, size: 28, font: "Times New Roman" })],
         }),
         ...(content.bibliography || []).map(item => new Paragraph({
           alignment: AlignmentType.LEFT,
-          spacing: { line: 360 },
+          spacing: { line: LINE_SPACING, after: 120 },
+          indent: { hanging: 450 }, // Hanging indent standar daftar pustaka
           children: [new TextRun({ text: safeXmlStr(item), font: "Times New Roman", size: 24 })]
         }))
       );
@@ -170,7 +209,11 @@ export const downloadAsDocx = async (data: PaperData) => {
     const doc = new Document({
       sections: [{
         properties: {
-          page: { margin: { top: 1701, right: 1701, bottom: 1701, left: 2268 } },
+          page: { 
+            // Margin standar Indonesia: Left 4cm, Top 3cm, Right 3cm, Bottom 3cm
+            // Twips: 1cm = 567 twips
+            margin: { top: 1701, right: 1701, bottom: 1701, left: 2268 } 
+          },
         },
         children: nodes,
       }],
@@ -189,6 +232,6 @@ export const downloadAsDocx = async (data: PaperData) => {
     }, 500);
   } catch (err) {
     console.error("DOCX Error:", err);
-    throw new Error("Gagal menyusun file Word.");
+    throw new Error("Gagal menyusun file Word. Silakan coba lagi.");
   }
 };
