@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { PaperInput, PaperData, EducationLevel, LanguageStyle } from './types';
+import { PaperInput, PaperData } from './types';
 import { generateAcademicPaper } from './services/geminiService';
 import PaperForm from './components/PaperForm';
 import PaperPreview from './components/PaperPreview';
@@ -14,21 +13,24 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const checkApiKey = async () => {
-      // Prioritaskan API_KEY dari environment
-      if (process.env.API_KEY && process.env.API_KEY !== "") {
+      // Akses aman ke process.env.API_KEY
+      const currentKey = (window as any).process?.env?.API_KEY;
+      const isKeyPresent = currentKey && typeof currentKey === 'string' && currentKey !== "undefined" && currentKey !== "";
+
+      if (isKeyPresent) {
         setNeedsKey(false);
         return;
       }
 
-      // Jika tidak ada di env, periksa apakah sudah dipilih via dialog aistudio
-      if (window.aistudio) {
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        if (!hasKey) {
+      // Jika env kosong, cek via helper aistudio
+      if ((window as any).aistudio) {
+        try {
+          const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+          setNeedsKey(!hasKey);
+        } catch (e) {
           setNeedsKey(true);
         }
       } else {
-        // Jika bukan di lingkungan aistudio dan env kosong, kita tetap tampilkan form 
-        // tapi kemungkinan akan error saat generate.
         setNeedsKey(false);
       }
     };
@@ -37,10 +39,13 @@ const App: React.FC = () => {
   }, []);
 
   const handleConnectKey = async () => {
-    if (window.aistudio) {
-      await window.aistudio.openSelectKey();
-      // Asumsikan pemilihan berhasil sesuai panduan race condition
-      setNeedsKey(false);
+    if ((window as any).aistudio) {
+      try {
+        await (window as any).aistudio.openSelectKey();
+        setNeedsKey(false);
+      } catch (e) {
+        setError("Gagal membuka pemilihan kunci.");
+      }
     }
   };
 
@@ -51,12 +56,13 @@ const App: React.FC = () => {
       const content = await generateAcademicPaper(input);
       setPaperData({ input, content });
     } catch (err: any) {
-      console.error(err);
-      if (err.message?.includes("Requested entity was not found")) {
-        setError("API Key tidak valid atau project tidak ditemukan. Mohon pilih kunci kembali.");
+      console.error("Generate Error:", err);
+      const msg = err.message || "";
+      if (msg.includes("API Key") || msg.includes("API key")) {
+        setError("API Key tidak terdeteksi. Silakan hubungkan melalui tombol di bawah.");
         setNeedsKey(true);
       } else {
-        setError(err.message || 'Terjadi kesalahan saat memproses data.');
+        setError(msg || 'Terjadi kesalahan saat menyusun makalah.');
       }
     } finally {
       setLoading(false);
@@ -71,24 +77,33 @@ const App: React.FC = () => {
   if (needsKey) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-10 text-center border border-slate-100">
+        <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-10 text-center border border-slate-100 animate-shake">
           <div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <i className="fas fa-key text-3xl"></i>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-3">Siapkan ScribeAkademik</h1>
+          <h1 className="text-2xl font-bold text-slate-900 mb-3">API Key Diperlukan</h1>
           <p className="text-slate-600 mb-8 leading-relaxed">
-            Untuk menggunakan model AI Gemini 3 Pro, Anda perlu menghubungkan API Key dari Google AI Studio (Project Berbayar).
+            ScribeAkademik membutuhkan <strong>API_KEY</strong> Gemini untuk bekerja. Jika Anda sudah mengaturnya di Vercel, pastikan untuk melakukan Redeploy.
           </p>
-          <button
-            onClick={handleConnectKey}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center space-x-3 mb-4"
-          >
-            <span>Hubungkan API Key</span>
-            <i className="fas fa-external-link-alt text-sm"></i>
-          </button>
-          <p className="text-xs text-slate-400 italic">
-            Pelajari tentang <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noreferrer" className="underline text-blue-500">penagihan API Gemini</a>.
-          </p>
+          
+          {(window as any).aistudio ? (
+            <button
+              onClick={handleConnectKey}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center space-x-3 mb-4"
+            >
+              <span>Pilih API Key Baru</span>
+              <i className="fas fa-external-link-alt text-sm"></i>
+            </button>
+          ) : (
+            <div className="bg-amber-50 p-4 rounded-lg text-amber-800 text-sm mb-6 border border-amber-200">
+              <i className="fas fa-info-circle mr-2"></i>
+              Tambahkan <code>API_KEY</code> di Vercel Dashboard dan pilih <strong>Redeploy</strong>.
+            </div>
+          )}
+          
+          <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noreferrer" className="text-xs text-blue-500 underline">
+            Info Penagihan & API Gemini
+          </a>
         </div>
       </div>
     );
@@ -107,11 +122,6 @@ const App: React.FC = () => {
                 ScribeAkademik
               </span>
             </div>
-            <div className="hidden md:block">
-              <span className="text-sm text-gray-500 italic">
-                Solusi cerdas penyusunan makalah
-              </span>
-            </div>
           </div>
         </div>
       </nav>
@@ -124,16 +134,12 @@ const App: React.FC = () => {
         ) : (
           <div className="max-w-4xl mx-auto py-10 px-4">
             <div className="text-center mb-10">
-              <h1 className="text-4xl font-extrabold text-gray-900 mb-4">
-                Buat Makalah Akademik Otomatis
-              </h1>
-              <p className="text-lg text-gray-600">
-                Masukkan detail topik Anda, dan AI kami akan menyusun draf makalah lengkap dengan struktur baku akademik Indonesia.
-              </p>
+              <h1 className="text-4xl font-extrabold text-gray-900 mb-4">Buat Makalah Otomatis</h1>
+              <p className="text-lg text-gray-600">AI cerdas untuk membantu menyusun draf akademik Anda secara instan.</p>
             </div>
 
             {error && (
-              <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-center animate-shake">
+              <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-center">
                 <i className="fas fa-exclamation-triangle mr-3"></i>
                 <p>{error}</p>
               </div>
@@ -142,41 +148,9 @@ const App: React.FC = () => {
             <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
               <PaperForm onSubmit={handleGenerate} />
             </div>
-            
-            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-              <div className="p-4">
-                <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <i className="fas fa-check-circle text-xl"></i>
-                </div>
-                <h3 className="font-semibold text-gray-800">Struktur Baku</h3>
-                <p className="text-sm text-gray-500">Otomatis menyusun Cover hingga Daftar Pustaka.</p>
-              </div>
-              <div className="p-4">
-                <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <i className="fas fa-shield-alt text-xl"></i>
-                </div>
-                <h3 className="font-semibold text-gray-800">Orisinalitas Tinggi</h3>
-                <p className="text-sm text-gray-500">Konten unik hasil pemikiran AI cerdas.</p>
-              </div>
-              <div className="p-4">
-                <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <i className="fas fa-file-word text-xl"></i>
-                </div>
-                <h3 className="font-semibold text-gray-800">Export DOCX</h3>
-                <p className="text-sm text-gray-500">Hasil bisa langsung diunduh dalam format Word.</p>
-              </div>
-            </div>
           </div>
         )}
       </main>
-
-      <footer className="bg-white border-t border-gray-200 py-8 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <p className="text-gray-400 text-sm">
-            &copy; {new Date().getFullYear()} ScribeAkademik AI. Membantu Literasi Bangsa.
-          </p>
-        </div>
-      </footer>
     </div>
   );
 };

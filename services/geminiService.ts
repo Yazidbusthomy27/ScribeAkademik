@@ -1,22 +1,29 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { PaperInput, PaperContent } from "../types";
 
 export const generateAcademicPaper = async (input: PaperInput): Promise<PaperContent> => {
-  // Inisialisasi GoogleGenAI baru tepat sebelum pemanggilan untuk memastikan kunci terbaru digunakan
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
-  // Pilih model berdasarkan mode (Mendalam vs Cepat)
+  const apiKey = (window as any).process?.env?.API_KEY;
+
+  if (!apiKey || apiKey === "undefined" || apiKey === "") {
+    throw new Error("API Key tidak ditemukan. Pastikan variabel API_KEY sudah diatur.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   const modelName = input.mode === 'deep' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
   
   const prompt = `Buatkan makalah akademik Bahasa Indonesia lengkap dengan format JSON.
-    Judul: ${input.title}
-    Penulis: ${input.author}
-    Instansi: ${input.institution}
-    Tingkat: ${input.educationLevel}
-    
-    Makalah harus memiliki: Kata Pengantar, BAB I (Latar Belakang, Rumusan, Tujuan), BAB II (Pembahasan mendalam), BAB III (Kesimpulan & Saran), dan Daftar Pustaka.
-    Bahasa: Formal Indonesia (PUEBI).`;
+Judul: ${input.title}
+Penulis: ${input.author}
+Instansi: ${input.institution}
+Tingkat: ${input.educationLevel}
+Gaya: ${input.languageStyle}
+
+Struktur JSON harus mencakup:
+1. preface (Kata Pengantar)
+2. introduction (background, problemFormulation[], objectives[])
+3. chapters (ARRAY of {title, subChapters: ARRAY of {title, content}})
+4. closing (conclusion, suggestions)
+5. bibliography (ARRAY of references)`;
 
   try {
     const response = await ai.models.generateContent({
@@ -73,7 +80,6 @@ export const generateAcademicPaper = async (input: PaperInput): Promise<PaperCon
           },
           required: ["introduction", "chapters", "closing", "bibliography"],
         },
-        // Alokasikan thinkingBudget untuk model Pro agar hasil lebih berkualitas
         thinkingConfig: { thinkingBudget: input.mode === 'deep' ? 10000 : 0 }
       },
     });
@@ -83,7 +89,7 @@ export const generateAcademicPaper = async (input: PaperInput): Promise<PaperCon
     
     return JSON.parse(result.trim());
   } catch (error: any) {
-    console.error("Gemini Error:", error);
-    throw error; // Biarkan komponen UI menangani error dengan informasi yang sesuai
+    console.error("Gemini Service Error:", error);
+    throw error;
   }
 };
