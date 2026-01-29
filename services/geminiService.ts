@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { PaperInput, PaperContent } from "../types";
 
@@ -16,31 +15,34 @@ export const generateAcademicPaper = async (input: PaperInput, customApiKey: str
     ? 'gemini-3-pro-preview' 
     : 'gemini-3-flash-preview';
 
-  const systemInstruction = `Anda adalah seorang Penulis Akademik Profesional Indonesia yang ahli dalam menyusun makalah, jurnal, dan karya ilmiah.
-Tugas Anda adalah membuat makalah LENGKAP DAN SANGAT MENDALAM berdasarkan input pengguna.
+  const systemInstruction = `Anda adalah seorang Penulis Akademik Senior dan Profesor di Indonesia yang ahli dalam menyusun draf makalah ilmiah tingkat tinggi.
+Tugas Anda adalah menulis makalah yang SANGAT PANJANG, DETAIL, dan KOMPREHENSIF.
 
-KRITERIA UTAMA:
-1. PANJANG KONTEN: Hasil harus sangat mendetail. 
-   - Latar Belakang (Bab I) harus minimal 5-7 paragraf yang menguraikan fenomena, data, dan urgensi masalah.
-   - Pembahasan (Bab II) harus memiliki minimal 3-4 sub-bab besar, di mana setiap sub-bab memiliki minimal 4-6 paragraf analitis yang panjang.
-2. BAHASA: Gunakan Bahasa Indonesia Formal (PUEBI/EYD) yang sangat kaku, objektif, dan akademis. Hindari pengulangan kata yang tidak perlu.
-3. ANALISIS: Berikan analisis teoritis yang kuat, kutipan ahli (simulasi), dan pembahasan yang komprehensif. Jangan hanya memberikan definisi.
-4. STRUKTUR: Ikuti struktur: Kata Pengantar, Pendahuluan, Pembahasan (dinamis), Penutup, dan Daftar Pustaka.
-5. DAFTAR PUSTAKA: Minimal 7-10 referensi akademik terbaru (5 tahun terakhir) dalam format APA Style.
+ATURAN KETAT PENULISAN:
+1. PANJANG KONTEN (WAJIB):
+   - Latar Belakang (Bab I): Minimal 800-1000 kata. Harus mencakup latar belakang masalah secara makro, meso, dan mikro. Sertakan urgensi penelitian secara mendalam.
+   - Pembahasan (Bab II): Harus terdiri dari minimal 3-5 sub-bab utama. Setiap sub-bab WAJIB memiliki penjelasan minimal 600-800 kata. Berikan analisis kritis, bukan sekadar teori dasar.
+   - Kesimpulan (Bab III): Harus komprehensif, merangkum seluruh hasil pembahasan secara sistematis.
+2. BAHASA: Gunakan Bahasa Indonesia Baku (PUEBI/EYD) dengan diksi akademik tingkat tinggi. Hindari kalimat retoris atau pengulangan ide.
+3. KUALITAS: Berikan argumen yang logis, koheren, dan berbasis data/teori kuat.
+4. FORMAT: Output harus JSON murni tanpa narasi tambahan di luar JSON.
 
-Format keluaran HARUS JSON murni tanpa teks pembuka/penutup.`;
+Struktur JSON:
+- preface: Kata pengantar yang menyentuh dan formal.
+- introduction: background (panjang), problemFormulation (3-5 poin), objectives (3-5 poin).
+- chapters: Array of objects (title, subChapters: array of {title, content}).
+- closing: conclusion (panjang), suggestions.
+- bibliography: Minimal 10 referensi akademik format APA Style.`;
 
-  const prompt = `Buatkan makalah akademik yang SANGAT PANJANG DAN MENDALAM dalam format JSON.
-Informasi Dasar:
-- Judul: ${input.title}
-- Penulis: ${input.author}
-- Institusi: ${input.institution}
-- Mata Kuliah: ${input.subject}
-- Tingkat Pendidikan: ${input.educationLevel}
-- Gaya Bahasa: ${input.languageStyle}
-- Mode: ${input.mode === 'deep' ? 'Mendalam/Komprehensif (Prioritaskan kedalaman materi)' : 'Standar'}
+  const prompt = `Buatkan MAKALAH AKADEMIK LENGKAP yang SANGAT PANJANG dengan judul: "${input.title}".
+Tingkat Pendidikan: ${input.educationLevel}.
+Mode: ${input.mode === 'deep' ? 'Mendalam/Komprehensif (Tulis seberapa panjang mungkin)' : 'Standar'}.
 
-Pastikan Bab II Pembahasan mencakup aspek teori, implementasi, dan analisis kritis yang luas.`;
+Instruksi Khusus:
+- Perluas setiap paragraf. Jangan hanya memberikan poin-poin.
+- Gunakan transisi antar paragraf yang halus.
+- Untuk tingkat Mahasiswa, sertakan tinjauan teoritis yang sangat kuat di Bab II.
+- Pastikan setiap sub-bab di Bab II membahas sudut pandang yang berbeda namun tetap relevan dengan judul.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -98,8 +100,8 @@ Pastikan Bab II Pembahasan mencakup aspek teori, implementasi, dan analisis krit
           },
           required: ["introduction", "chapters", "closing", "bibliography"],
         },
-        // Memberikan thinking budget maksimal untuk kualitas tertinggi
-        ...(input.mode === 'deep' ? { thinkingConfig: { thinkingBudget: 32768 } } : { thinkingConfig: { thinkingBudget: 16000 } })
+        // Memberikan thinking budget maksimal untuk model Pro agar hasil lebih matang dan panjang
+        ...(modelName === 'gemini-3-pro-preview' ? { thinkingConfig: { thinkingBudget: 32768 } } : { thinkingConfig: { thinkingBudget: 16000 } })
       },
     });
 
@@ -109,6 +111,9 @@ Pastikan Bab II Pembahasan mencakup aspek teori, implementasi, dan analisis krit
     return JSON.parse(text.trim());
   } catch (error: any) {
     console.error("Gemini Error:", error);
+    if (error.message?.includes("429") || error.message?.includes("RESOURCE_EXHAUSTED")) {
+      throw new Error("Kuota API Key Anda telah habis atau limit harian tercapai. Silakan coba lagi nanti atau gunakan API Key dengan project/penagihan yang berbeda.");
+    }
     throw new Error(error.message || "Gagal berkomunikasi dengan layanan AI.");
   }
 };

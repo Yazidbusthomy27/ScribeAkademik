@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { PaperInput, PaperData } from './types';
 import { generateAcademicPaper } from './services/geminiService';
@@ -46,6 +45,8 @@ const App: React.FC = () => {
       const msg = err.message || "";
       if (msg.includes("API_KEY_INVALID") || msg.includes("not found") || msg.includes("401") || msg.includes("403")) {
         setError("API Key tidak valid atau tidak memiliki izin. Periksa kembali kunci Anda.");
+      } else if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED")) {
+        setError("Kuota API Key Anda telah habis. Hal ini terjadi karena batas penggunaan model (misal: Gemini 3 Pro) pada akun gratis telah terlampaui. Silakan tunggu beberapa saat atau gunakan API Key lain.");
       } else {
         setError(msg || 'Terjadi kesalahan sistem saat menyusun makalah.');
       }
@@ -89,7 +90,7 @@ const App: React.FC = () => {
         ) : (
           <div className="max-w-5xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-12">
-              <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-900 mb-6 tracking-tight">
+              <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-900 mb-6 tracking-tight leading-tight">
                 Penyusun Makalah <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Otomatis</span>
               </h1>
               <p className="text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
@@ -140,7 +141,7 @@ const App: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="font-bold mb-1">Terjadi Masalah</h4>
-                  <p className="text-sm opacity-90">{error}</p>
+                  <p className="text-sm opacity-90 leading-relaxed">{error}</p>
                 </div>
               </div>
             )}
@@ -159,7 +160,7 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* Bagian Keunggulan / Kelebihan Aplikasi - Sekarang Hanya 3 */}
+            {/* Bagian Keunggulan / Kelebihan Aplikasi - 3 Fitur Utama */}
             <div className="mt-24 space-y-16">
               <div className="text-center">
                 <h2 className="text-3xl font-black text-slate-900 mb-4 uppercase tracking-tighter">Keunggulan ScribeAkademik</h2>
